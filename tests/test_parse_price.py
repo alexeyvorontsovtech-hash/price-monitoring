@@ -29,6 +29,9 @@ import price_monitor  # noqa: E402
     ("1 990,50 ₽", 1990.5),
     ("1990", 1990.0),
     ("от 1 990 ₽", 1990.0),
+    ("1 990 ₽", 1990.0),
+    ("1 990 ₽", 1990.0),
+    ("12 345 678 ₽", 12345678.0),
 ])
 def test_parse_price_text_single_number(text, expected_price):
     price, error = price_monitor.parse_price_text(text)
@@ -43,6 +46,7 @@ def test_parse_price_text_single_number(text, expected_price):
 @pytest.mark.parametrize("text", [
     "1 990 ₽ 2 500 ₽",
     "1990 руб. (было 2490)",
+    "1990 250",
 ])
 def test_parse_price_text_multiple_numbers_is_error(text):
     price, error = price_monitor.parse_price_text(text)
@@ -58,6 +62,27 @@ def test_parse_price_text_no_number_is_error():
     price, error = price_monitor.parse_price_text("Нет в наличии")
     assert price is None
     assert "не удалось распознать" in error
+
+
+# =====================================================================
+# extract_price — текст из дочерних тегов не должен склеиваться без пробела
+# =====================================================================
+
+@pytest.mark.parametrize("html", [
+    '<div class="price"><span>1990</span><s>2490</s></div>',
+    '<div class="price"><span>1 990 ₽</span><s>2 490 ₽</s></div>',
+])
+def test_extract_price_child_tags_without_separator_is_error(html):
+    price, error = price_monitor.extract_price(html, ".price")
+    assert price is None
+    assert "несколько чисел" in error
+
+
+def test_extract_price_single_number_split_across_child_tag():
+    html = '<div class="price"><span>1 990</span> ₽</div>'
+    price, error = price_monitor.extract_price(html, ".price")
+    assert price == 1990.0
+    assert error is None
 
 
 # =====================================================================
