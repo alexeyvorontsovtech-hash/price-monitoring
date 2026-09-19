@@ -1,0 +1,17 @@
+{
+  "url": "https://alexeyvorontsovtech-hash.github.io/price-monitor-demo/",
+  "products": [
+    {
+      "name": "Беспроводные наушники",
+      "selector": "#product-1 .price"
+    },
+    {
+      "name": "Механическая клавиатура",
+      "selector": "#product-2 .price"
+    }
+  ],
+  "telegram_chat_id": "ВАШ_CHAT_ID",
+  "history_file": "history.csv",
+  "log_file": "price_monitor.log",
+  "notify_on_errors": true
+}

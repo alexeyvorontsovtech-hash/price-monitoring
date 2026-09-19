@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Тестовый магазин — демо для мониторинга цен</title>
+<style>
+  body { font-family: Arial, sans-serif; background: #f5f5f5; padding: 40px; }
+  h1 { text-align: center; color: #333; }
+  .catalog { display: flex; gap: 24px; justify-content: center; flex-wrap: wrap; }
+  .card {
+    background: #fff; border: 1px solid #ddd; border-radius: 8px;
+    padding: 20px; width: 240px; text-align: center;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  }
+  .card h2 { font-size: 18px; margin: 12px 0; color: #222; }
+  .price { font-size: 22px; font-weight: bold; color: #2a7d2a; }
+  .note { text-align: center; color: #888; margin-top: 40px; font-size: 13px; }
+</style>
+</head>
+<body>
+
+<h1>Тестовый магазин</h1>
+
+<div class="catalog">
+  <div class="card" id="product-1">
+    <h2>Беспроводные наушники</h2>
+    <div class="price">1 990 ₽</div>
+  </div>
+
+  <div class="card" id="product-2">
+    <h2>Механическая клавиатура</h2>
+    <div class="price">3 490 ₽</div>
+  </div>
+</div>
+
+<p class="note">
+  Демо-страница для портфолио-проекта «Мониторинг цены + уведомление в Telegram».
+  Цена в блоке <code>.price</code> меняется вручную для проверки скрипта.
+</p>
+
+</body>
+</html>
