@@ -43,6 +43,11 @@ def parse_args():
         "--config", "-c", default="config.json",
         help="путь к JSON-конфигу (по умолчанию config.json)",
     )
+    parser.add_argument(
+        "--dry-run", action="store_true",
+        help="не отправлять в Telegram, а печатать то же сообщение в консоль; "
+             "токен и chat_id для этого режима не нужны",
+    )
     return parser.parse_args()
 
 
@@ -108,7 +113,22 @@ def get_bot_token():
 # =====================================================================
 
 def download_page(url):
-    """Скачивает HTML страницы. Возвращает (html, ошибка) — один из них всегда None."""
+    """Скачивает HTML страницы. Возвращает (html, ошибка) — один из них всегда None.
+
+    Если url не начинается с http:// или https://, он считается локальным путём
+    (обычным или в виде file://) — страница в этом случае читается с диска,
+    без обращения к интернету (удобно для проверки на testpage/index.html).
+    """
+    if not re.match(r"^https?://", url):
+        path = url[len("file://"):] if url.startswith("file://") else url
+        try:
+            with open(path, encoding="utf-8") as f:
+                return f.read(), None
+        except FileNotFoundError:
+            return None, f"локальный файл не найден: {path}"
+        except OSError as e:
+            return None, f"не удалось прочитать локальный файл: {e}"
+
     try:
         response = requests.get(
             url, timeout=REQUEST_TIMEOUT,
@@ -223,6 +243,14 @@ def send_telegram_message(token, chat_id, text):
         return False
 
 
+def notify(token, chat_id, text, dry_run):
+    """Уведомляет об изменении: в --dry-run печатает текст в консоль, иначе шлёт в Telegram."""
+    if dry_run:
+        print(f"[DRY-RUN] Сообщение в Telegram:\n{text}")
+        return True
+    return send_telegram_message(token, chat_id, text)
+
+
 # =====================================================================
 # Лог ошибок
 # =====================================================================
@@ -243,7 +271,7 @@ def log_error(log_path, message):
 # Обработка одного товара
 # =====================================================================
 
-def check_product(product, html, config, token, timestamp):
+def check_product(product, html, config, token, timestamp, dry_run):
     """Проверяет цену одного товара: сравнивает с историей, уведомляет, пишет строку в CSV."""
     name = product["name"]
     selector = product["selector"]
@@ -254,7 +282,7 @@ def check_product(product, html, config, token, timestamp):
         message = f"Не удалось проверить цену «{name}»: {error}"
         log_error(config["log_file"], message)
         if config["notify_on_errors"]:
-            send_telegram_message(token, config["telegram_chat_id"], f"⚠️ {message}")
+            notify(token, config["telegram_chat_id"], f"⚠️ {message}", dry_run)
         return
 
     last_price = get_last_price(history_path, name)
@@ -269,8 +297,9 @@ def check_product(product, html, config, token, timestamp):
         return
 
     message = build_change_message(name, last_price, price)
-    send_telegram_message(token, config["telegram_chat_id"], message)
-    print(message)
+    notify(token, config["telegram_chat_id"], message, dry_run)
+    if not dry_run:
+        print(message)
 
 
 # =====================================================================
@@ -280,19 +309,19 @@ def check_product(product, html, config, token, timestamp):
 def main():
     args = parse_args()
     config = load_config(args.config)
-    token = get_bot_token()
+    token = None if args.dry_run else get_bot_token()
 
     html, error = download_page(config["url"])
     if error:
         message = f"Не удалось проверить цены: страница недоступна ({config['url']}) — {error}"
         log_error(config["log_file"], message)
         if config["notify_on_errors"]:
-            send_telegram_message(token, config["telegram_chat_id"], f"⚠️ {message}")
+            notify(token, config["telegram_chat_id"], f"⚠️ {message}", args.dry_run)
         sys.exit(1)
 
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     for product in config["products"]:
-        check_product(product, html, config, token, timestamp)
+        check_product(product, html, config, token, timestamp, args.dry_run)
 
 
 if __name__ == "__main__":

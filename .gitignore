@@ -2,3 +2,4 @@
 __pycache__/
 .env
 price_monitor.log
+history.csv
