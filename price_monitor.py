@@ -103,7 +103,7 @@ def get_bot_token():
     if not token:
         sys.exit(
             "Ошибка: не задана переменная окружения TELEGRAM_BOT_TOKEN.\n"
-            "       Установите её перед запуском (см. .env.example и README)."
+            "       Установите её перед запуском (см. README)."
         )
     return token
 
@@ -149,18 +149,23 @@ def download_page(url):
 def parse_price_text(text):
     """Превращает текст цены ("1 990 ₽", "1990", "1 990,50 ₽") в число.
 
-    Если распознать не удалось, возвращает None.
+    Возвращает (цена, ошибка) — один из них всегда None. Ищет в тексте все
+    числа (пробел или \xa0 — разделитель тысяч, , или . — десятичный
+    разделитель). Если число одно — оно и есть цена. Если чисел нет — цена не
+    распознана. Если чисел несколько (например, в блоке рядом старая и новая
+    цена) — селектор захватывает лишнее, гадать нельзя, это тоже ошибка.
     """
-    text = text.replace("\xa0", " ")
-    cleaned = re.sub(r"[^0-9,.\s]", "", text)  # убираем ₽, руб. и прочие буквы
-    cleaned = re.sub(r"\s", "", cleaned)  # убираем пробелы-разделители тысяч
-    cleaned = cleaned.replace(",", ".")
-    if not cleaned:
-        return None
-    try:
-        return float(cleaned)
-    except ValueError:
-        return None
+    normalized = text.replace("\xa0", " ")
+    matches = re.findall(r"\d+(?:[ ]\d{3})*(?:[.,]\d+)?", normalized)
+
+    if not matches:
+        return None, f"не удалось распознать цену в тексте '{text}'"
+
+    if len(matches) > 1:
+        return None, f"в элементе несколько чисел ('{text}'), уточните CSS-селектор"
+
+    cleaned = matches[0].replace(" ", "").replace(",", ".")
+    return float(cleaned), None
 
 
 def extract_price(html, selector):
@@ -171,10 +176,7 @@ def extract_price(html, selector):
         return None, f"элемент по селектору '{selector}' не найден (возможно, изменилась структура сайта)"
 
     text = element.get_text(strip=True)
-    price = parse_price_text(text)
-    if price is None:
-        return None, f"не удалось распознать цену в тексте '{text}'"
-    return price, None
+    return parse_price_text(text)
 
 
 # =====================================================================
@@ -230,7 +232,12 @@ def build_change_message(product_name, old_price, new_price):
 
 
 def send_telegram_message(token, chat_id, text):
-    """Отправляет сообщение в Telegram через Bot API. Возвращает True/False (успех)."""
+    """Отправляет сообщение в Telegram через Bot API. Возвращает True/False (успех).
+
+    Текст исключения requests не печатается и не логируется: он содержит
+    полный URL запроса вместе с токеном бота. Наружу идёт только код ответа
+    (для HTTP-ошибок) или имя класса исключения — без токена.
+    """
     url = TELEGRAM_API_URL.format(token=token)
     try:
         response = requests.post(
@@ -238,8 +245,12 @@ def send_telegram_message(token, chat_id, text):
         )
         response.raise_for_status()
         return True
+    except requests.exceptions.HTTPError as e:
+        status = e.response.status_code if e.response is not None else "?"
+        print(f"Ошибка: не удалось отправить уведомление в Telegram (HTTP {status})")
+        return False
     except requests.exceptions.RequestException as e:
-        print(f"Ошибка: не удалось отправить уведомление в Telegram: {e}")
+        print(f"Ошибка: не удалось отправить уведомление в Telegram ({type(e).__name__})")
         return False
 
 
